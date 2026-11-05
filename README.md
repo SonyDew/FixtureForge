@@ -1,6 +1,6 @@
 # FixtureForge
 
-**SonyDev GitHub Marathon — Day 10 (November 5, 2026). Status: In Development.**
+**SonyDev GitHub Marathon — Day 10 (November 5, 2026). Status: Experimental.**
 
 FixtureForge generates deterministic JSON fixtures from a restricted JSON Schema subset. It uses the Python standard library, does not access the network, and does not modify input files.
 
@@ -32,3 +32,11 @@ Reviewed the published generator, CLI, tests, and package metadata. Corrected tw
 The numeric interpolation was checked separately with 100 generated values between -1e308 and 1e308 on the available Python runtime. The full repository test suite and installed CLI were not executed in this review because a working local checkout was unavailable. The six new tests are committed but not yet verified by a full test run. Status remains In Development.
 
 Known limitations: this tool implements only the documented schema subset; it is not a JSON Schema validator. Large or deeply nested output can consume substantial memory, and seed reproducibility is tied to this implementation. Before marking the MVP complete, run `python -m unittest discover -s tests -v` and test the installed command from a clean environment.
+
+## Development report — evening, November 5, 2026
+
+The evening review found a syntax error introduced in the afternoon array validation edit: literal backslash-n sequences had been inserted into Python source. This was corrected. The array generator now returns an empty array when no `items` schema is present; nonempty `const` and `enum` values without `items` are rejected. Floating-point generation now uses weighted endpoints to avoid overflow across wide ranges. Integer bounds no longer convert arbitrarily large integers to floats during validation. CLI diagnostics no longer echo unsupported schema keys.
+
+A reconstructed local copy of the generator and CLI passed 28 unittest cases on the available Python runtime, including negative tests for malformed JSON, invalid schemas, read-only input behavior, reproducibility, large integer bounds, and wide numeric ranges. The original published test file was reviewed and eight regression tests were added to it. The published checkout could not be cloned in this environment because GitHub DNS resolution failed, so the complete committed tree and installed wheel have **not** been tested together. The local test result must not be interpreted as a verified run of the published repository.
+
+Status: Experimental. Before marking the MVP complete, clone the current main branch, run `python -m unittest discover -s tests -v`, install the package into a clean virtual environment, and verify the documented commands. No GitHub Actions or external services are required.
