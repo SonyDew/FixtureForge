@@ -23,11 +23,11 @@ def validate(schema, depth=0):
         "boolean": set(),
         "null": set(),
     }
-    if kind not in allowed:
+    if not isinstance(kind, str) or kind not in allowed:
         raise SchemaError("unsupported or missing type")
     unknown = set(schema) - allowed[kind] - {"type", "enum", "const"}
     if unknown:
-        raise SchemaError("unsupported keywords: " + ", ".join(sorted(unknown)))
+        raise SchemaError("unsupported schema keywords")
     if "properties" in schema:
         if not isinstance(schema["properties"], dict):
             raise SchemaError("properties must be an object")
@@ -53,13 +53,19 @@ def validate(schema, depth=0):
         if schema.get(lo, 0) > schema.get(hi, 1000):
             raise SchemaError(lo + " exceeds " + hi)
     for key in ("minimum", "maximum"):
-        if key in schema and (type(schema[key]) not in (int, float) or not math.isfinite(schema[key])):
-            raise SchemaError(key + " must be finite")
+        if key in schema:
+            value = schema[key]
+            if type(value) not in (int, float) or (type(value) is float and not math.isfinite(value)):
+                raise SchemaError(key + " must be finite")
+            if kind == "number" and type(value) is int and abs(value) > 10**308:
+                raise SchemaError(key + " is outside supported floating-point range")
     if "minimum" in schema and "maximum" in schema and schema["minimum"] > schema["maximum"]:
         raise SchemaError("minimum exceeds maximum")
     if kind == "integer" and math.ceil(schema.get("minimum", 0)) > math.floor(schema.get("maximum", 100)):
         raise SchemaError("integer range is empty")
-    if kind == "array" and "items" not in schema and schema.get("minItems", 0) > 0:\n        raise SchemaError("nonempty array requires items")\n    if "enum" in schema and (not isinstance(schema["enum"], list) or not schema["enum"]):
+    if kind == "array" and "items" not in schema and schema.get("minItems", 0) > 0:
+        raise SchemaError("nonempty array requires items")
+    if "enum" in schema and (not isinstance(schema["enum"], list) or not schema["enum"]):
         raise SchemaError("enum must be a nonempty array")
     try:
         candidates = schema.get("enum", []) + ([schema["const"]] if "const" in schema else [])
@@ -93,6 +99,8 @@ def matches(value, schema):
     if kind == "array":
         if not schema.get("minItems", 0) <= len(value) <= schema.get("maxItems", 1000):
             return False
+        if "items" not in schema and value:
+            return False
         if "items" in schema and any(not matches(x, schema["items"]) for x in value):
             return False
     if kind == "object":
@@ -118,13 +126,19 @@ def make(schema, rng):
     if kind == "number":
         lo, hi = schema.get("minimum", 0), schema.get("maximum", 100)
         if lo > hi: raise SchemaError("number range is empty")
-        return lo if lo == hi else lo + (hi - lo) * rng.random()
+        if lo == hi:
+            return lo
+        weight = rng.random()
+        result = (1.0 - weight) * lo + weight * hi
+        return min(hi, max(lo, result))
     if kind == "string":
         low, high = schema.get("minLength", 0), schema.get("maxLength", 16)
         n = rng.randint(low, max(low, min(high, 32)))
         alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
         return "".join(rng.choice(alphabet) for _ in range(n))
     if kind == "array":
+        if "items" not in schema:
+            return []
         low, high = schema.get("minItems", 0), schema.get("maxItems", 3)
         n = rng.randint(low, max(low, min(high, 10)))
         if n and "items" not in schema:
