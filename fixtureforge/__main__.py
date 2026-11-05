@@ -17,7 +17,7 @@ def main(argv=None):
                 schema = json.load(source)
         values = generate(schema, args.seed, args.count)
     except (OSError, UnicodeError, json.JSONDecodeError, SchemaError, OverflowError, ValueError) as exc:
-        message = str(exc) if isinstance(exc, SchemaError) else "invalid input"
+        message = "invalid input or unsupported schema"
         print("fixtureforge: " + message, file=sys.stderr)
         return 2
     print(json.dumps(values, ensure_ascii=False, indent=2, allow_nan=False))
