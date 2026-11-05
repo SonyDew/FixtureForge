@@ -59,7 +59,7 @@ def validate(schema, depth=0):
         raise SchemaError("minimum exceeds maximum")
     if kind == "integer" and math.ceil(schema.get("minimum", 0)) > math.floor(schema.get("maximum", 100)):
         raise SchemaError("integer range is empty")
-    if "enum" in schema and (not isinstance(schema["enum"], list) or not schema["enum"]):
+    if kind == "array" and "items" not in schema and schema.get("minItems", 0) > 0:\n        raise SchemaError("nonempty array requires items")\n    if "enum" in schema and (not isinstance(schema["enum"], list) or not schema["enum"]):
         raise SchemaError("enum must be a nonempty array")
     try:
         candidates = schema.get("enum", []) + ([schema["const"]] if "const" in schema else [])
