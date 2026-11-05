@@ -83,5 +83,53 @@ class FixtureTests(unittest.TestCase):
         self.assertNotIn(secret, result.stderr)
         self.assertFalse(result.stdout)
 
+
+    def test_const_array_without_items_rejected(self):
+        with self.assertRaises(SchemaError):
+            generate({"type": "array", "const": [1]})
+
+    def test_enum_array_without_items_rejected(self):
+        with self.assertRaises(SchemaError):
+            generate({"type": "array", "enum": [[1]]})
+
+    def test_large_integer_bounds(self):
+        value = 10 ** 400
+        self.assertEqual(generate({"type": "integer", "minimum": value, "maximum": value}), [value])
+
+    def test_numeric_bound_boolean_rejected(self):
+        with self.assertRaises(SchemaError):
+            generate({"type": "integer", "minimum": True})
+
+    def test_unknown_keyword_not_echoed(self):
+        secret = "private_value_123"
+        result = subprocess.run(
+            [sys.executable, "-m", "fixtureforge", "-"],
+            input=json.dumps({"type": "string", secret: 1}),
+            capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertNotIn(secret, result.stderr)
+
+    def test_fixed_numeric_bounds(self):
+        self.assertEqual(generate({"type": "number", "minimum": 2.5, "maximum": 2.5}, count=10), [2.5] * 10)
+
+    def test_nested_required_values(self):
+        schema = {"type": "object", "required": ["items"], "properties": {
+            "items": {"type": "array", "minItems": 2, "maxItems": 2,
+                      "items": {"type": "string", "const": "a"}}}}
+        self.assertEqual(generate(schema), [{"items": ["a", "a"]}])
+
+    def test_invalid_input_file_unchanged(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "bad.json"
+            path.write_text("{bad")
+            before = path.read_bytes()
+            result = subprocess.run(
+                [sys.executable, "-m", "fixtureforge", str(path)],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(path.read_bytes(), before)
+
 if __name__ == "__main__":
     unittest.main()
